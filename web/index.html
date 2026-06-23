@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>网络聊天应用</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section id="loginView" class="login-view">
+      <div class="brand-mark">聊</div>
+      <h1>网络聊天应用</h1>
+      <p id="loginStatus" class="status-text">注册或登录账号后开始聊天</p>
+      <form id="authForm" class="login-form">
+        <label for="nameInput">账号</label>
+        <input id="nameInput" name="name" type="text" maxlength="20" autocomplete="username" placeholder="请输入账号" required>
+        <label for="passwordInput">密码</label>
+        <input id="passwordInput" name="password" type="password" minlength="6" autocomplete="current-password" placeholder="至少 6 位" required>
+        <div class="button-row">
+          <button id="loginButton" type="submit">登录</button>
+          <button id="registerButton" type="button" class="secondary-button">注册</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="chatView" class="chat-view hidden">
+      <header class="chat-header">
+        <div>
+          <p id="connectionStatus" class="connection-status">已连接</p>
+          <h2 id="chatTitle">群聊</h2>
+        </div>
+        <button id="logoutButton" class="ghost-button" type="button">退出</button>
+      </header>
+
+      <nav class="contacts-wrap" aria-label="聊天对象">
+        <div id="contacts" class="contacts"></div>
+      </nav>
+
+      <section id="messages" class="messages" aria-live="polite"></section>
+
+      <form id="messageForm" class="message-form">
+        <textarea id="messageInput" rows="1" placeholder="输入消息" autocomplete="off"></textarea>
+        <button id="sendButton" type="submit">发送</button>
+      </form>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

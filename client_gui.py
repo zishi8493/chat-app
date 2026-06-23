@@ -64,6 +64,7 @@ class ChatClientGUI:
         self.host_var = tk.StringVar(value=DEFAULT_HOST)
         self.port_var = tk.StringVar(value=DEFAULT_PORT)
         self.name_var = tk.StringVar()
+        self.password_var = tk.StringVar()
         self.target_var = tk.StringVar(value="群聊")
         self.status_var = tk.StringVar(value="未连接")
         self.online_users = []
@@ -107,13 +108,15 @@ class ChatClientGUI:
 
         self.add_labeled_entry(card, "服务器地址", self.host_var, 2)
         self.add_labeled_entry(card, "端口", self.port_var, 3)
-        name_entry = self.add_labeled_entry(card, "昵称", self.name_var, 4)
+        name_entry = self.add_labeled_entry(card, "账号", self.name_var, 4)
         name_entry.bind("<Return>", lambda _event: self.login())
+        password_entry = self.add_labeled_entry(card, "密码", self.password_var, 5, show="*")
+        password_entry.bind("<Return>", lambda _event: self.login())
 
         login_button = tk.Button(
             card,
             text="登录",
-            width=24,
+            width=13,
             bg=GREEN_DARK,
             fg=WHITE,
             activebackground="#06ad56",
@@ -122,10 +125,26 @@ class ChatClientGUI:
             command=self.login,
             font=("Microsoft YaHei UI", 11),
         )
-        login_button.grid(row=5, column=0, columnspan=2, pady=(26, 10), ipady=6)
+        login_button.grid(row=6, column=0, pady=(26, 10), ipady=6)
 
-        hint = tk.Label(card, text="云服务器已配置：可直接输入昵称登录。", bg=WHITE, fg=MUTED, font=("Microsoft YaHei UI", 9))
-        hint.grid(row=6, column=0, columnspan=2)
+        register_button = tk.Button(
+            card,
+            text="注册账号",
+            width=13,
+            bg=WHITE,
+            fg=GREEN_DARK,
+            activebackground="#eef8f2",
+            activeforeground=GREEN_DARK,
+            relief=tk.FLAT,
+            highlightthickness=1,
+            highlightbackground=GREEN_DARK,
+            command=self.register,
+            font=("Microsoft YaHei UI", 11),
+        )
+        register_button.grid(row=6, column=1, pady=(26, 10), ipady=6)
+
+        hint = tk.Label(card, text="首次使用请先注册账号；密码至少 6 位。", bg=WHITE, fg=MUTED, font=("Microsoft YaHei UI", 9))
+        hint.grid(row=7, column=0, columnspan=2)
 
         for child in card.winfo_children():
             child.grid_configure(padx=7, pady=7)
@@ -148,11 +167,12 @@ class ChatClientGUI:
             self.login_canvas.coords(self.login_card_window, center_x, center_y)
 
     @staticmethod
-    def add_labeled_entry(frame, label, variable, row):
+    def add_labeled_entry(frame, label, variable, row, show=None):
         tk.Label(frame, text=label, bg=WHITE, fg="#444444", width=10, anchor="e", font=("Microsoft YaHei UI", 10)).grid(row=row, column=0)
         entry = tk.Entry(
             frame,
             textvariable=variable,
+            show=show,
             width=30,
             relief=tk.FLAT,
             highlightthickness=1,
@@ -296,19 +316,23 @@ class ChatClientGUI:
         host = self.host_var.get().strip()
         port_text = self.port_var.get().strip()
         name = self.name_var.get().strip()
+        password = self.password_var.get()
 
-        if not host or not port_text or not name:
-            messagebox.showwarning("提示", "服务器地址、端口和昵称都不能为空。")
+        if not host or not port_text or not name or not password:
+            messagebox.showwarning("提示", "服务器地址、端口、账号和密码都不能为空。")
             return
         if any(ch.isspace() for ch in name):
-            messagebox.showwarning("提示", "昵称不能包含空格。")
+            messagebox.showwarning("提示", "账号不能包含空格。")
+            return
+        if len(password) < 6 or any(ch.isspace() for ch in password):
+            messagebox.showwarning("提示", "密码至少 6 位，且不能包含空格。")
             return
 
         try:
             port = int(port_text)
             self.sock = socket.create_connection((host, port), timeout=5)
             self.file = self.sock.makefile("r", encoding=ENCODING, newline="\n")
-            self.send_json({"type": "login", "name": name})
+            self.send_json({"type": "login", "name": name, "password": password})
             response = self.read_json()
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             self.close_connection()
@@ -321,8 +345,10 @@ class ChatClientGUI:
             return
 
         self.name = name
+        self.password_var.set("")
         self.sock.settimeout(None)
         self.connected = True
+        self.message_records.clear()
         self.build_chat_view()
         self.append_system_message("登录成功，可以开始聊天。")
 
@@ -330,6 +356,45 @@ class ChatClientGUI:
         receive_thread.start()
         heartbeat_thread = threading.Thread(target=self.heartbeat_loop, daemon=True)
         heartbeat_thread.start()
+
+    def register(self):
+        host = self.host_var.get().strip()
+        port_text = self.port_var.get().strip()
+        name = self.name_var.get().strip()
+        password = self.password_var.get()
+
+        if not host or not port_text or not name or not password:
+            messagebox.showwarning("提示", "服务器地址、端口、账号和密码都不能为空。")
+            return
+        if any(ch.isspace() for ch in name):
+            messagebox.showwarning("提示", "账号不能包含空格。")
+            return
+        if len(password) < 6 or any(ch.isspace() for ch in password):
+            messagebox.showwarning("提示", "密码至少 6 位，且不能包含空格。")
+            return
+
+        sock = None
+        file = None
+        try:
+            port = int(port_text)
+            sock = socket.create_connection((host, port), timeout=5)
+            file = sock.makefile("r", encoding=ENCODING, newline="\n")
+            data = json.dumps({"type": "register", "name": name, "password": password}, ensure_ascii=False) + "\n"
+            sock.sendall(data.encode(ENCODING))
+            response = self.read_json_from(file)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            messagebox.showerror("注册失败", f"无法连接服务器：{exc}")
+            return
+        finally:
+            if file:
+                file.close()
+            if sock:
+                sock.close()
+
+        if response and response.get("success"):
+            messagebox.showinfo("注册成功", response.get("message", "注册成功，请登录。"))
+        else:
+            messagebox.showerror("注册失败", response.get("message", "服务器拒绝注册。") if response else "服务器无响应。")
 
     def receive_loop(self):
         try:
@@ -381,6 +446,8 @@ class ChatClientGUI:
             self.append_system_message(data.get("message", ""))
         elif msg_type == "users":
             self.update_contacts(data.get("users", []))
+        elif msg_type == "history":
+            self.append_history(data.get("messages", []))
         elif msg_type == "error":
             self.append_system_message(data.get("message", ""))
         elif msg_type == "pong":
@@ -473,6 +540,25 @@ class ChatClientGUI:
         )
         self.render_messages()
         self.scroll_to_bottom()
+
+    def append_history(self, messages):
+        for item in messages:
+            sender = item.get("from", "")
+            target = item.get("to", "all")
+            self.message_records.append(
+                {
+                    "type": "chat",
+                    "sender": sender,
+                    "target": target,
+                    "message": item.get("message", ""),
+                    "time": item.get("time", ""),
+                    "is_self": sender == self.name,
+                    "is_private": target != "all",
+                }
+            )
+        if messages:
+            self.render_messages()
+            self.scroll_to_bottom()
 
     def on_canvas_configure(self, event):
         if getattr(self, "chat_background_image", None):
@@ -627,6 +713,13 @@ class ChatClientGUI:
 
     def read_json(self):
         line = self.file.readline()
+        if not line:
+            return None
+        return json.loads(line)
+
+    @staticmethod
+    def read_json_from(file):
+        line = file.readline()
         if not line:
             return None
         return json.loads(line)
